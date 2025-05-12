@@ -1,0 +1,1822 @@
+---
+title: "Analysis of Heart Disease Dataset"
+author: "Sanja Stanisic, Universita' degli Studi di Milano Bicocca, CdLM Data Science, n. 800409"
+date: "27. January 2021."
+output:
+  word_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '5'
+  ioslides_presentation:
+    css:
+    - css/fonts.css
+    - css/custom.css
+    - css/title-slide.css
+    - css/slide-background.css
+    includes:
+      before_body: html/title.html
+    toc: yes
+    transition: default
+    widescreen: yes
+  beamer_presentation:
+    colortheme: lily
+    fig_caption: no
+    fig_height: 6
+    fig_width: 7
+    fonttheme: structurebold
+    theme: Hannover
+    toc: yes
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+  slidy_presentation:
+    highlight: default
+  prettydoc::html_pretty:
+    df_print: paged
+    highlight: vignette
+    theme: architect
+    toc: yes
+    toc_depth: 5
+course: Data Science Lab
+link-citations: true
+bibliography: biblio.bib
+csl: ieee-with-url.csl
+---
+
+```{r setup, include=FALSE}
+# Use 'verbatim = TRUE' as chunk option to show chunk code as is
+if(require(knitr)==FALSE) install.packages("knitr")
+hook_source_def = knit_hooks$get('source')
+knit_hooks$set(source = function(x, options){
+  if (!is.null(options$verbatim) && options$verbatim){
+    opts = gsub(",\\s*verbatim\\s*=\\s*TRUE\\s*", "", options$params.src)
+    bef = sprintf('\n\n    ```{r %s}\n', opts, "\n")
+    stringr::str_c(bef, paste(knitr:::indent_block(x, "    "), collapse = '\n'), "\n    ```\n")
+  } else {
+     hook_source_def(x, options)
+  }
+})
+```
+
+### Introduction
+
+Cardiovascular diseases are one of the most common diseases that cause a large number of deaths each year. Coronary Artery Disease (CAD) is the most common type of these diseases worldwide and is the main reason of heart attacks. Thus early diagnosis of CAD is very essential and is an important field of medical studies. Many methods are used to diagnose CAD so far. These methods can help in reducing cost and deaths.
+
+Emerging machine learning (ML) and data mining (DM) technologies are beginning to transform medicine and healthcare and could also improve the diagnosis and treatment of various diseases, including CAD.
+
+
+The dataset under study is the Heart Disease Dataset, available on the IEEE Data Port Platform [-@ieeedataport]. This database provides comprehensive and fundamental information on early detection of CAD disease in order to illuminate the patterns and processes that are used in ML/DM approaches. Heart Disease Dataset is curated by combining 5 popular heart disease datasets already available independently but notcombined before. In this dataset, 5 heart datasets are combined over 11 common features which makes it the largest heartdisease dataset available so far for research purposes. The datasets used for its curation are Cleveland, Hungaria, Switzerland, Long Beach and Statlog (Heart).
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(data.table)
+
+heart_dt <- fread("heart_statlog_cleveland_hungary_final.csv", dec=".")
+heart_dt$chest_pain_type = heart_dt$"chest pain type"
+heart_dt$"chest pain type" <- NULL
+heart_dt$fasting_blood_sugar = heart_dt$"fasting blood sugar"
+heart_dt$"fasting blood sugar" <- NULL
+heart_dt$resting_ecg = heart_dt$"resting ecg"
+heart_dt$"resting ecg" <- NULL
+heart_dt$exercise_angina = heart_dt$"exercise angina"
+heart_dt$"exercise angina" <- NULL
+heart_dt$ST_slope = heart_dt$"ST slope"
+heart_dt$"ST slope" <- NULL
+
+heart_dt$resting_bp_s = heart_dt$"resting bp s" 
+heart_dt$"resting bp s" <- NULL
+heart_dt$max_heart_rate = heart_dt$"max heart rate"
+heart_dt$"max heart rate" <- NULL
+
+heart_dt
+```
+This dataset consists of 1190 instances with 11 features:
+
+1. "age" - Age of the individual, numeric (expressed in years)
+
+2. "sex" - Gender of the individual, binary (0 = female, 1= male)
+
+3. "cholesterol" - Individual's serum cholesterol level, numeric (expressed in mg/dl)
+
+4. "chest_pain_type" - Type of chest pain, nominal (0 = typical angina, 1 = atypical angina, 2 = non-anginal pain, 3 = asymptomatic)
+
+5. "resting_bp_s" - Resting blood pressure of the individual, numeric (expressed in mm Hg)
+
+6. "fasting_blood_sugar" - If blood sugar of the individual is high e.g. > 120 mg/dl, binary (1 = true; 0 = false)
+
+7. "resting_ecg" - Resting electrocardiogram results of the individual, nominal (0 = normal, 1 = having ST-T wave abnormality e.g. T wave inversions and/or ST elevation or depression of > 0.05 mV, 2 = showing probable or definite left ventricular hypertrophy by Estes' criteria)
+
+8. "max_heart_rate" - Maximum heart rate that is achieved, numeric
+
+9. "exercise_angina" - Exercise induced angina, binary (1 = yes, 0 = no)
+
+10. "oldpeak" - oldpeak of the individual, numeric (measures depression)
+
+11. "ST_slope" - The slope of the peak within exercise ST segment, nominal (1 = upsloping, 2 = flat, 3 = downsloping)
+
+Dataset contains one dependent variable,"target", which represents class of the individual, binary (1 = heart disease, 0 = normal).
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+heart_dt_exp <- fread("heart_statlog_cleveland_hungary_final.csv", dec=".")
+
+heart_dt_exp$sex = cut(heart_dt_exp$sex, 2, labels=c('male', 'female')) 
+heart_dt_exp$"chest_pain_type" = cut(heart_dt_exp$"chest pain type", 4, labels=c('typical angina', 'atypical angina', 'non-anginal pain', 'asymptomatic')) 
+heart_dt_exp$"chest pain type" <- NULL
+heart_dt_exp$"fasting_blood_sugar" = cut(heart_dt_exp$"fasting blood sugar", 2, labels=c('no','yes')) 
+heart_dt_exp$"fasting blood sugar" <- NULL
+heart_dt_exp$"resting_ecg" = cut(heart_dt_exp$"resting ecg", 3, labels = c( 'normal', 'having ST-T wave abnormality', 'showing probable')) 
+heart_dt_exp$"resting ecg" <- NULL
+heart_dt_exp$"exercise_angina" = cut(heart_dt_exp$"exercise angina", 2, labels=c('no','yes')) 
+heart_dt_exp$"exercise angina" <- NULL
+heart_dt_exp$"ST_slope" = cut(heart_dt_exp$"ST slope", 3,labels=c('upsloping', 'flat', 'downsloping')) 
+heart_dt_exp$"ST slope" <- NULL
+
+heart_dt_exp$"target" = cut(heart_dt_exp$"target", 2, labels=c('normal', 'heart disease') ) 
+
+heart_dt_exp$resting_bp_s = heart_dt_exp$"resting bp s" 
+heart_dt_exp$"resting bp s" <- NULL
+heart_dt_exp$max_heart_rate = heart_dt_exp$"max heart rate"
+heart_dt_exp$"max heart rate" <- NULL
+
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+
+tibble(heart_dt_exp)
+
+heart_dt_exp %>% colnames()
+```
+
+The goal of this analysis is to predict if the given individual have heart disease using machine learning tools and evaluate the goodness of the predictions.
+
+This report is organized in sections, as follows:
+
+* **Preprocessing**. Here, in order to make the dataset more suitable for analysis, the missing values are checked and treated (if necessary), dataset features are analyzed and transformed.
+
+* **Data exploration**. In this section, features from the dataset are analyzed, with focus on the existance of the heart disease.
+
+* **Models**. This section describes the different models used in this report to predict the ilness.
+
+* **Implementation and evaluation**. Implementation of the previously selected models, implementation of whole ML/DM workflow and evaluation of compared models are described in this section.
+
+* **Conclusion**. At the end, conclusions are emphases as the final section of the report.
+
+### Preprocessing
+
+Firstly, it should be checked is there missing values in dataset.
+
+```{r echo=FALSE, message=TRUE, warning=FALSE, include=TRUE}
+library(dplyr)
+colSums(is.na(heart_dt)) %>% show() # 0 in respective coumn indicates that there are no missing data
+colSums(is.na(heart_dt_exp)) %>% show() # 0 in respective coumn indicates that there are no missing data
+
+```
+Obtained result indicate that thete is no misisng values. Therefore, there is no need to correct existng data.
+
+After that, we should look for invalid values - values that are out of meanningfull doman.
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+print( "age")
+print( nrow(heart_dt[age <= 1 || age >= 110]) ) 
+print( "sex")
+print( nrow(heart_dt[sex != 1 && sex != 2]) ) 
+print( "resting_bp_s")
+print( nrow(heart_dt[resting_bp_s <= 30 || resting_bp_s > 260]) ) 
+
+```
+It can be concluded that all values for attributes "age", "sex" and "resting_bp_s" are within required range, so there in ton need for improving that data.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+print( "with cholesterol level 0")
+print( nrow(heart_dt[cholesterol == 0]) ) 
+```
+
+As can be seen, there are 172 individuals in this dataset whose cholesterol level is set to 0. 
+
+First proposition is that level 0 indicate "normal" chorestelol level. In that case, in order to improve value of the feature "cholesterol", correction should be applied. Therefore, healty individuals with original choresterol level 0, it will be set to value 170, which is "normal" value, according to [@medline]. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+x <- heart_dt[cholesterol == 0]%>%select(c("cholesterol", "target"))
+print( "healthy, with cholesterol level 0")
+print( nrow(x[target==0]) )
+print( "ill, with cholesterol level 0")
+print( nrow(x[target==1]) )
+```
+
+However, further data examination shows that among individuals with colesterol level set to 0, there are much more them with hart disease (152) than the normal ones (20). Therefore, the first proposition dosn't hold, so the proposed correction will be missleading. 
+
+Therefore, that some other type of correction sholud be applied. Simlpy removing 172 rows from data set is not good option - on that case, dataset is shrinked form more than 10% of its original size.
+
+In this situation, the chosen policy is to calculate Q1 and Q3 fo cholesterol level in part of population that have inserted cholesterol level, to set cholesterol level for 152 unhelthy individuals to uniformely dispersed value closed to Q3, and for 20 healthy individuals to uniformely dispersed value closed to Q1, where Q1 and Q3 calculation are based on the subpopulation that have cholesterol level bigger than 0.   
+
+Therefore, cholesterol level for 20 healthy individuals will be set to values around 209, and for 152 unhealthy individuals to values around 276.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#x = quantile(data$cholesterol)
+#quantile1 <- as.numeric( x[2][1] )
+quantile1 <- 209
+#quantile3 <- as.numeric( x[4][1] )
+quantile3 <- 276
+width <- (quantile3 - quantile1) /8.0
+# width
+set.seed(123499)
+for (i in 1:dim(heart_dt)[1]) {
+    if (heart_dt$cholesterol[i] == 0 && heart_dt$target[i] == 0) {
+      heart_dt$cholesterol[i] <- as.integer( runif(quantile1-width, quantile1 + width) )
+    } 
+    if (heart_dt$cholesterol[i] == 0 && heart_dt$target[i] == 1) {
+      heart_dt$cholesterol[i] <- as.integer( runif(quantile3-width, quantile3 + width) )
+    } 
+}
+heart_dt[cholesterol == 0]
+
+for (i in 1:dim(heart_dt_exp)[1]) {
+    if (heart_dt_exp$cholesterol[i] == 0 && heart_dt_exp$target[i] == 'normal') {
+      heart_dt_exp$cholesterol[i] <- as.integer( runif(quantile1-width, quantile1 + width) )
+    } 
+    if (heart_dt_exp$cholesterol[i] == 0 && heart_dt_exp$target[i] == 'heart disease') {
+      heart_dt_exp$cholesterol[i] <- as.integer( runif(quantile3-width, quantile3 + width) )
+    } 
+}
+heart_dt_exp[cholesterol == 0]
+```
+### Data exploration
+
+Since the research question is to predict if the individual has CAD, so variable "target" to be the dependent variable in this analysis. That variable is treated as a discrete attribute and its prediction will be executed as classification process.
+
+**1. Distribution of outcome**
+
+In this section, distribution of "target" is examinated.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("target")
+heart_dt_exp$target %>% table()
+
+library(ggplot2)
+
+ggplot(heart_dt_exp,aes(x =target)) + 
+  geom_bar(width = 0.4,fill =c("green","red")) + 
+  geom_text(stat = 'count', aes(label =..count..),vjust =-0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution") 
+
+```
+
+Within dataset of 1190 individuals, there are 629 that suffered from heart disease, and 561 that not.
+
+Corelations about "target" and other dataset features will be further examinate in subsequent sections.
+
+**2. Corelation**
+
+Corelation among variables in dataset is calculated and displayed on the following diagram. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(data.table)
+library(tidyverse)
+
+heart_df <- as.data.frame(heart_dt) 
+heart_df$cholesterol <- NULL 
+
+M <- cor(heart_df)
+M1 <- round(M, 3)
+M1
+```
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(corrplot)
+
+M <- cor(heart_df)
+corrplot(M, method = "circle")
+```
+
+In this diagram, positive corelation is marked with different shades of blue, while negative correlation is marked with different shades of red. More intesive color indicate that correlation is higher.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+library(lares)
+
+corr_var(heart_df, # name of dataset
+  target, # name of variable to focus on
+  top = 5 # display top 5 correlations
+)
+```
+
+**3. Feature "age"**
+
+From diagram that display corelation among all columns can be seen that "age" is not directly highly correlated with "target", but is is significantly corelated with "max heart rate", which is further highly correlated with "target", so feature "age" can not be excluded from further analysis. 
+ 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("age")
+heart_dt_exp$age %>% summary()
+```
+Obtained data and digrams indicate that:
+
+- Minimum age is 28 and Maximum age is 77. Average age of population is 53.72.
+
+- Maximum number of population lying between age group 54 and 60 years.
+
+
+Subsequently, visualization of the "age" distribution will give more insights. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+library(ggplot2)
+
+boxplot(heart_dt_exp$age,col = "dodgerblue2",main ="Boxplot of age",col.main="dodgerblue4")
+
+ggplot(heart_dt_exp,aes(x = age)) + 
+  geom_histogram(bins =30,fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Age distribution") + 
+  ylab("number of people")
+
+ggplot(heart_dt_exp,aes(x = age)) + 
+  geom_density(fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Age distribution") + 
+  ylab("density")
+
+```
+
+The following diagrams visualize connection between "age" and "target" in the data set under consideration.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+library(ggplot2)
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Age distirbution by target", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Age distirbution by target", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Density distirbution of age and target", x="age", y="density")
+
+```
+
+In those diagrams, red surface indicate people with hearth disesases ("target" is 1), while green surface indicate people that have no herath disease ("target" is 0). 
+
+The diagrams indicate that there is a connection between "age" and "taget" and nature of that connection is subject of further analysis. 
+
+**4. Feature "sex"**
+
+Concerning "sex  attribute, several analysis are done. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("sex")
+heart_dt_exp$sex %>% table()
+```
+
+Out of 1190 bservations, 281 of them are male and 909 are female.
+
+From the diagram that displays all column corelations, it is clear that that there is significant corellation between "sex" and "target".
+
+After that, "sex" distribution and joint "sex", "age" distribution are considered.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp,aes(x =sex, fill=sex)) + 
+  geom_bar(width = 0.4,fill =c("blue","red")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust =-0.5, size = 2) + 
+  theme_bw() + 
+  theme_classic() +
+  ylab("number of people") + 
+  ggtitle("Sex distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("blue", "red")) +
+    labs(fill="", title="Age distirbution by sex", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("blue", "red")) +
+    labs(fill="", title="Age distirbution by sex", x="age", y="number of people")
+
+```
+Insights:
+ 
+- From the barplot, it is clearly Visible that proportion of male is more as compared to female. 
+
+- It this dataset, it seems that "sex" and "age" are not corelated.
+
+
+After that, influense that "sex" have to "target" is visualized on the following diagrams:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp,aes(x =sex, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.5, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Sex distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count', aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.5, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +  
+  theme_bw()  + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by sex") 
+
+```
+
+
+From joint target, sex distribution diagrams, it can be seen that:
+
+- Diagrams with joint distribution of "sex" and target further confirm the finding that there is correlation between them.
+
+- In case of not suffered with heart attack, female is very less (211 vs. 80) while more male has suffered heart attack (350 vs. 559). 
+  
+- Now when we look at the population suffered with attack it can be seeing clearly that more male suffered with heart attack (558 vs 70).
+
+Therefore, attribute "sex" should not be neglected in further analysis.
+
+**5. Feature "cholesterol"**
+
+In this subsection, influence of cholestrol level to final outcome is studied. Cholesterol level is already corrected in preprocessing phase.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("cholesterol")
+#heart_dt_exp$cholesterol
+heart_dt_exp$cholesterol %>% summary()
+```
+
+It can be seen that minimum cholestrol among patients is 85, maxmum is 603 and average cholestrol is 245.9.
+
+
+Cholesterol distribution, as well as corelation between "cholesterol" and feature "sex" are examined and visualized. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+boxplot(heart_dt_exp$chol,col = "dodgerblue2",main ="Boxplot of cholesterol",col.main="dodgerblue4")
+
+ggplot(heart_dt_exp,aes(cholesterol)) + 
+  geom_histogram(bins =20,fill ="green") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Cholesterol distribution") 
+
+ggplot(heart_dt_exp,aes(cholesterol)) + 
+  geom_density(fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Density plot of cholesterol") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Cholesterol distirbution by sex", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Cholesterol distirbution by sex", x="cholesterol", y="number of people")
+
+# unnecessary !!!
+# res_df <- as.data.frame(heart_dt_exp)
+# id <- rownames(res_df)
+# res_df <- cbind(id=id, res_df)
+# res_df$sex <- NULL  
+# res_df$oldpeak <- NULL              
+# res_df$target <- NULL     
+# res_df$chest_pain_type <- NULL
+# res_df$fasting_blood_sugar <- NULL
+# res_df$resting_ecg <- NULL     
+# res_df$exercise_angina <- NULL          
+# res_df$ST_slope <- NULL        
+# res_df$resting_bp_s <- NULL      
+# res_df$max_heart_rate <- NULL
+# res_dt <- as.data.table(res_df)
+# res_dt <- melt(res_dt, id.vars = c('id'), 
+#      measure.vars = c('age', 'cholesterol') )
+# ggplot(data=res_dt, aes(x=value, group=variable, fill=variable)) +
+#     geom_histogram(adjust=1.5, alpha=.4) +
+#     xlab("distribution") +
+#     ylab("value") + 
+#     ggtitle("Distributions of age and cholesterol") 
+
+```
+
+It can be concluded that:
+
+- Cholesterol data distribution have peak located near to 280 unit and that peak is enlarged within preprocessing step, when invalid data are improvied.
+
+ - In boxplot for descriptive cholesterol analysis seperately for male and female is also clear that male has lower colestrol than female.
+ 
+ - We can clearly see in two last diagrams that maximum population have cholestrol between 200 and 250 unit.
+
+At the end, let us examine joint distributions of "cholesterol" and "target".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Cholsterol distirbution by target", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Cholesterol distirbution by target", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Cholesterol density by target", x="cholesterol", y="density")
+
+
+```
+
+It can be seen that there are ore healthy persons with lower level of holesterol, than the ill ones. This confirms existence some kind of correlation between "cholesterol" and "target",
+
+As a final conslusion, "cholesterol" should be considered in further analysis.
+
+*6. Feature "chest_pain_type"*
+
+In this section, influence of "chest_pain_type" on "target" is stydied. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("chest_pain_type")
+heart_dt_exp$chest_pain_type %>% table()
+```
+
+There is 4 category of chest pain ("typical angina", "atypical angina", "non-anginal pain" and "asymptomatic") with frequencies 66, 216, 283 and 625 respectively.
+
+
+After that, distribution of "chest_pain_type", and its relations to features "age", "sex" and "cholesterol" are visualized.  
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x = chest_pain_type)) + 
+  geom_bar(width =0.2,fill = c("darkred", "orange", "darkgreen", "green")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust = -0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Chest pain type distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Age distirbution by chest pain type", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=chest_pain_type)) +
+    geom_density( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Age density by chest pain type", x="age", y="density")
+
+ggplot(heart_dt_exp, aes(x=chest_pain_type, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Chest pain type distribution by sex") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Cholesterol distirbution by chest pain type", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=chest_pain_type)) +
+    geom_density( color="#e9ecef", alpha=0.3, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Cholesterol density by chest pain type", x="cholesterol", y="density")
+
+```
+Insights:
+
+- From the first barplot "Chest pain type distribution" it is clear that most people having type of asymptomatic chest pain, followed by non anginal chest pain.
+
+- People with age among 50 and 65 more often feel asymptomatic chest pain.
+
+- Within male subpopulation, asymptomatic chest pain ocures twor times more often than non anginal chest pain.
+
+- Within female subpopulation, occurences of asymptomatic chest pain, non-anginal chest pain and atypical angina are close.  
+
+At the end of this discussion, corelation betwwen "chest_pain_type" and "target" is visualized:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x=chest_pain_type, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Chest pain type distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=chest_pain_type)) + 
+  geom_bar(width = 0.2) + 
+  # geom_text(stat = 'count',aes(label =..count.., y=600-..count..), vjust=-0.5, size = 3) + 
+  geom_text(stat = 'count',aes(label =..count..),position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by chest pain type") 
+
+```
+Last two diagrams indicate that:
+
+ - People with asymtpomatic chest pain are more likely to get heart attack.
+ 
+ - For other types of chest pain, prognossis is better.
+
+*7. Feature "resting_bp_s"*
+
+Now,blood pressure analysis while resting is done. 
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+print("resting_bp_s")
+heart_dt <-heart_dt[!is.na(heart_dt$resting_bp_s), ]
+heart_dt <-heart_dt[heart_dt$resting_bp_s != 0, ]
+
+heart_dt_exp <-heart_dt_exp[!is.na(heart_dt_exp$resting_bp_s), ]
+heart_dt_exp <-heart_dt_exp[heart_dt_exp$resting_bp_s != 0, ]
+heart_dt_exp$resting_bp_s %>% summary()
+
+```
+
+Insights:
+- Minimum RBP(rest blood pressure) is 80 and Maximum is 200.
+- Average RBP is 132.2
+
+We can see diagrams for descriptive analysis of "resting_bp_s" and diagrams that visuelize its correlation to features "sex" and "chest_pain_type".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+boxplot(heart_dt_exp$chol,col = "dodgerblue2",main ="Boxplot of resting_bp_s",col.main="dodgerblue4")
+
+ggplot(heart_dt_exp,aes(resting_bp_s)) + 
+  geom_histogram(bins =20,fill ="green") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Resting bloot preasure distribution") 
+
+ggplot(heart_dt_exp,aes(resting_bp_s)) + 
+  geom_density(fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Density plot of resting_bp_s") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Resting blood preasure distirbution by sex", x="resting_bp_s", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Resting blood preasure distirbution by sex", x="resting_bp_s", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Resting blood distirbution density by chest pain type", x="resting_bp_s", y="density")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Resting blood preasure distirbution by chest pain type", x="resting_bp_s", y="number of people")
+
+
+```
+
+From previous diagrams, definitive conclusions about features can not be drawn.
+
+Let us analize correspondance between "resting_bp_s" and "target".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Resting blood preasure distirbution by target", x="resting_bp_s", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Resting blood preasure distirbution by target", x="resting_bp_s", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Resting blood preasure density by target", x="resting_bp_s", y="density")
+
+
+```
+
+Insights:
+
+- There is low positive correlation between "resting_bp_s" and "target", so with increasing "resting_bp_s" chance of getting heart attack will increase.
+
+- This can clearly see in histograms - maximum number of population have rest blood pressure between 120 and 140.
+
+
+*8 Feature "fasting_blood_sugar"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("fasting_blood_sugar")
+heart_dt_exp$fasting_blood_sugar %>% table()
+
+```
+
+This is a categorical Variable in which 0 means level is less than 120 unit and 1 means it is greater than 120 unit. It is clearly visible that maximum (85% of the population) Peoples have "fasting_blood_sugar" less than 120.
+
+Concerning corelations with other features, situaction is as follows:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x = fasting_blood_sugar)) + 
+  geom_bar(width =0.2,fill = c("red", "darkred")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust = -0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Fasting blood sugar distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=fasting_blood_sugar)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("red", "darkred")) +
+    labs(fill="", title="Age distirbution by fasting blood sugar", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=fasting_blood_sugar)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("red", "darkred")) +
+    labs(fill="", title="Cholesterol distirbution by fasting blood sugar", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=fasting_blood_sugar)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Resting blood preasure distirbution by fasting blood sugar", x="resting blood preasure", y="number of people")
+
+
+ggplot(heart_dt_exp, aes(x=fasting_blood_sugar, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Fasting blood sugar distribution by sex") 
+
+ggplot(heart_dt_exp, aes(x=sex, fill=fasting_blood_sugar)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("red", "darkred")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Sex distribution by fasting blood sugar") 
+
+```
+From previous diagrams, no additional info about feature corelations with "fasting_blood_sugar" can not be established.
+
+The following diagrams display  corelation between "fasting_blood_sugar" and "target".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x=fasting_blood_sugar, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Fasting blood sugar distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=fasting_blood_sugar)) + 
+  geom_bar(width = 0.2) + 
+  # geom_text(stat = 'count',aes(label =..count.., y=600-..count..), vjust=-0.5, size = 3) + 
+  geom_text(stat = 'count',aes(label =..count..),position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("red", "darkred")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by fasting blood sugar") 
+
+```
+
+Diagrams indicate that higher fasting blood sugar increase probability of heart attack.
+
+*9. Feature "resting_ecg"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("resting_ecg")
+heart_dt_exp$resting_ecg %>% table()
+
+```
+
+Thas feature describes ECG result while individual is resting. There are 3 categories ("normal", "having ST-T wave abnormality", "showing probable"). Category "having ST-T wave abnormality" of ECG is rare.
+
+We will check correlation between this feature and other previously mentioned features. The following diagrams helsp is visualizing this:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x = resting_ecg)) + 
+  geom_bar(width =0.2,fill = c("blue", "darkblue", "cyan")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust = -0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Resting ECG distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=resting_ecg)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("blue", "darkblue", "cyan")) +
+    labs(fill="", title="Age distirbution by resting ECG", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=resting_ecg)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("blue", "darkblue", "cyan")) +
+    labs(fill="", title="Cholesterol distirbution by resting ECG", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=resting_ecg)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("blue", "darkblue", "cyan")) +
+    labs(fill="", title="Resting blood preasure distirbution by resting ECG", x="resting blood preasure", y="number of people")
+
+
+ggplot(heart_dt_exp, aes(x=resting_ecg, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Resting ECG distribution by sex") 
+
+ggplot(heart_dt_exp, aes(x=sex, fill=resting_ecg)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "darkblue", "cyan")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Sex distribution by resting ECG") 
+
+```
+Diagrams indicate that:
+
+- Younger people more often have normal resting ECG.
+
+- People with normal chorestelol more often jave normal resting ECG.
+
+- People with blood preasure that is not high more often have normal resting ECG. 
+
+- Men, proportionaly, more often have normal resting ECG that it is case with women.  
+
+
+Concerning corelation between "resting_ecg" and "target", situation is as follows:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x=resting_ecg, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Resting ECG distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=resting_ecg)) + 
+  geom_bar(width = 0.2) + 
+  # geom_text(stat = 'count',aes(label =..count.., y=600-..count..), vjust=-0.5, size = 3) + 
+  geom_text(stat = 'count',aes(label =..count..),position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "darkblue", "cyan")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by resting ECG") 
+
+```
+
+Diagrams indicate that people with ST-T wave abnormality will have higher chances to get heart hiseasses than people from other types of resing ECG.
+
+
+*10. Feature "max_heart_rate"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("max_heart_rate")
+heart_dt_exp$max_heart_rate %>% summary()
+
+```
+
+That feature describes maximum heart rate. This is continous data with minimum heart rate achieved 66 and maximum 202.
+
+Let us visualize corelation between "max_heart_rate" and other features:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+boxplot(heart_dt_exp$max_heart_rate,col = "dodgerblue2",main ="Boxplot of max_heart_rate",col.main="dodgerblue4")
+
+ggplot(heart_dt_exp,aes(max_heart_rate)) + 
+  geom_histogram(bins =20,fill ="green") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Maximum heart rate distribution") 
+
+ggplot(heart_dt_exp,aes(max_heart_rate)) + 
+  geom_density(fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Density plot of max_heart_rate") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Maximum heart rate distirbution by sex", x="max_heart_rate", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Maximum heart rate distirbution by sex", x="max_heart_rate", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Maximum heart rate distirbution density by chest pain type", x="max_heart_rate", y="density")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Maximum heart rate distirbution by chest pain type", x="max_heart_rate", y="number of people")
+
+
+```
+It can be concluded that:
+
+- Density have two peaks, one around 120 and the other around 150.
+
+- In boxplot we can see that male more often achieve higher maximum heart rate achieved than female. Therefore, maximim heart rate is depending on sex.
+
+- It can be seen that atypical angina and non-anginal pain occure more often when individual have higher resting blood preasure. 
+
+
+At the end, let us visualze links between "max_heart_rate" and "target".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Maximum heart rate distirbution by target", x="max_heart_rate", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Maximum heart rate distirbution by target", x="max_heart_rate", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Maximum heart rate density by target", x="max_heart_rate", y="density")
+
+heart_dt_exp %>%
+  ggplot( aes(x=max_heart_rate, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Maximum heart rate density by target", x="max_heart_rate", y="density")
+
+
+```
+
+We can see that there are many people with heart problem that have not so high maximum heart rate..
+
+
+*11. Feature "exercise_angina"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("exercise_angina")
+heart_dt_exp$exercise_angina %>% table()
+
+```
+
+
+Angina is a type of chest pain caused by induced flow of blood to heart. Feature "exercise_angina" represents info if chosen individual excercises angina, or not. This variable is categorical.
+
+The following diagrams visualize distribution of "exercise_angina", and correlation between this feature and other previously mentioned features:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x = exercise_angina)) + 
+  geom_bar(width =0.2,fill = c("green", "darkgreen")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust = -0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Exercise angina distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=exercise_angina)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values = c("green", "darkgreen")) +
+    labs(fill="", title="Age distirbution by exercise angina", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=exercise_angina)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("green", "darkgreen")) +
+    labs(fill="", title="Cholesterol distirbution by exercise angina", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=exercise_angina)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("green", "darkgreen")) +
+    labs(fill="", title="Resting blood preasure distirbution by exercise angina", x="resting blood preasure", y="number of people")
+
+
+ggplot(heart_dt_exp, aes(x=exercise_angina, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Exercise angina distribution by sex") 
+
+ggplot(heart_dt_exp, aes(x=sex, fill=exercise_angina)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "darkgreen")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Sex distribution by exercise angina") 
+
+```
+
+We can clearly see that:
+
+- Older people tent to exercise angina more often.
+
+- People with lower cholesterol level tend to exercise angina more rarely.
+
+- People with normal resting blod preasure tend to exercise angina more rarely.
+
+- Proportionaly, women exercise angina more often.
+
+Following diagrams display corelation between "exercise_angina" and "target":
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x=exercise_angina, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count', aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Excercise angina distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=exercise_angina)) + 
+  geom_bar(width = 0.2) + 
+  # geom_text(stat = 'count',aes(label =..count.., y=600-..count..), vjust=-0.5, size = 3) + 
+  geom_text(stat = 'count',aes(label =..count..),position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "darkgreen")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by resting excercise angina") 
+
+```
+
+From previous diagrams, it is clear that with increase in "exercise_angina", chance of heart attack is increasing.
+
+*12. Feature "oldpeak"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("oldpeak")
+heart_dt_exp$oldpeak %>% summary()
+
+```
+
+Feature "oldpeak" represents ST depression induced by exercise relative to rest.
+
+Insights:
+
+- This variable is numeric with minimum being -2.60 and maximum 6.20
+
+- We can see thar maximum population is lying between 0 - 1.6.
+
+- Data is right skewed, not normally distributed.
+
+Diagrams that visuelize distribution of "oldpeak" and its correlation to other features are, as follows:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+boxplot(heart_dt_exp$oldpeak, col = "dodgerblue2",main ="Boxplot of oldpeak",col.main="dodgerblue4")
+
+ggplot(heart_dt_exp,aes(oldpeak)) + 
+  geom_histogram(bins =20,fill ="green") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Oldpeak rate distribution") 
+
+ggplot(heart_dt_exp,aes(oldpeak)) + 
+  geom_density(fill ="dodgerblue4") + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("Density plot of oldpeak") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Oldpeak distirbution by sex", x="oldpeak", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=sex)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("red", "blue")) +
+    labs(fill="", title="Oldpeak distirbution by sex", x="oldpeak", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'stack') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Oldpeak distirbution density by chest pain type", x="oldpeak", y="density")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=chest_pain_type)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("darkred", "orange", "darkgreen", "green")) +
+    labs(fill="", title="Oldpeak distirbution by chest pain type", x="oldpeak", y="number of people")
+
+
+```
+
+In those diagrams, we can see that: 
+
+- There are are some outliers, is represented by circle above boxplot.
+
+- Also, feature "oldpeak" is generally bigger within male as compared to female. 
+
+Here is visualization of relationsheep between "oldpeak" and "target".
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Oldpeak distirbution by target", x="oldpeak", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=target)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Oldpeak distirbution by target", x="oldpeak", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'stack') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Oldpeak density by target", x="oldpeak", y="density")
+
+heart_dt_exp %>%
+  ggplot( aes(x=oldpeak, fill=target)) +
+    geom_density( color="#e9ecef", alpha=0.6, position = 'dodge') +
+    scale_fill_manual(values=c("green", "red")) +
+    labs(fill="", title="Oldpeak density by target", x="oldpeak", y="density")
+
+
+```
+
+*13. Feature "ST_slope"*
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+print("ST_slope")
+heart_dt_exp$ST_slope %>% table()
+
+```
+
+That feature indicate if slope of peak. This is category variable with 3 categories: upsloping, flat and downsloping.
+
+Following diagrams display "ST_slope" distribution, and connection between this feature and all other features:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x = ST_slope)) + 
+  geom_bar(width =0.2,fill = c("yellow", "orange", "pink")) + 
+  geom_text(stat = 'count',aes(label =..count..),vjust = -0.5) + 
+  theme_bw() + 
+  theme_classic() + 
+  ggtitle("ST slope distribution") 
+
+heart_dt_exp %>%
+  ggplot( aes(x=age, fill=ST_slope)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("yellow", "orange", "pink")) +
+    labs(fill="", title="Age distirbution by ST slope", x="age", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=cholesterol, fill=ST_slope)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("yellow", "orange", "pink")) +
+    labs(fill="", title="Cholesterol distirbution by ST slope", x="cholesterol", y="number of people")
+
+heart_dt_exp %>%
+  ggplot( aes(x=resting_bp_s, fill=ST_slope)) +
+    geom_histogram( color="#e9ecef", alpha=0.8, position = 'dodge') +
+    scale_fill_manual(values=c("yellow", "orange", "pink")) +
+    labs(fill="", title="Resting blood preasure distirbution by ST slope", x="resting blood preasure", y="number of people")
+
+
+ggplot(heart_dt_exp, aes(x=ST_slope, fill=sex)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("blue", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("ST slope distribution by sex") 
+
+ggplot(heart_dt_exp, aes(x=sex, fill=ST_slope)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("yellow", "orange", "pink")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Sex distribution by ST slope") 
+
+```
+
+Insights:
+
+- Within population upsloping ST slope and flat ST slope are nearly same and in maximum number.
+
+- People with age between 55 and 65 years have more flat and more downsloping ST slopes in comparison to other. 
+
+- Small part od male population have downsloping ST slope.
+
+At the end of this section, visualization of relationsheep between "ST_slope" and "target" is made:
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(heart_dt_exp, aes(x=ST_slope, fill=target)) + 
+  geom_bar(width = 0.2) + 
+  geom_text(stat = 'count',aes(label =..count..), position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("green", "red")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("ST slope distribution by target") 
+
+ggplot(heart_dt_exp,aes(x =target, fill=ST_slope)) + 
+  geom_bar(width = 0.2) + 
+  # geom_text(stat = 'count',aes(label =..count.., y=600-..count..), vjust=-0.5, size = 3) + 
+  geom_text(stat = 'count',aes(label =..count..),position=position_dodge(width=0.9), vjust=-0.25, size = 0) + 
+  scale_fill_manual(values=c("yellow", "orange", "pink")) +
+  theme_bw() + 
+  theme_classic() + 
+  ylab("number of people") + 
+  ggtitle("Target distribution by ST slope") 
+
+```
+
+Let us denote that: 
+
+- People with oldpeak category flat is more likely to get heart attack. 
+
+- People with category upsloping is less likely to get heart attack.
+
+
+### Models
+
+Different Machine Learning models were chosen for predicting the "target" variable. Here is the list of models that are used in this report:
+
+- k Nearest Neihbours (**k-nn**), described in [@murphy pp. 16--18]. An object is classified by a plurality vote of its neighbors, with the object being assigned to the class most common among its k nearest neighbors (k is a positive integer, typically small). I 
+
+- Naive Bayes (**nb**), explained in [@murphy pp. 82--95]. It is simple "probabilistic classifier" based on applying Bayes' theorem, with strong (e.g. naïve) assumptions of independence between the features. In other words, naive Bayes classifier assume that the value of a particular feature is independent of the value of any other feature, given the class variable.
+
+- SVM with Linear Kernel (**svm-l**), described in [@murphy pp.  482--486]. Training algorithm of SVM builds a model that assigns new examples to one category or the other, making it a non-probabilistic binary linear classifier.
+
+- SVM with Radial Kernel (**svm-r**), also described in [@murphy pp. 498--505]. It is using the kernel trick, which implicitly maps kernel inputs into high-dimensional feature spaces where features are linearly separable. In this case kernel is defined with Gaussian radial basis function, given by formula: 
+
+$$k(x_{i}, x_{j}) = e ^ {- \sigma {|x_{i} - x_{j}|}^2 }$$ 
+
+
+- Random Forest (**rf**), also described in [@murphy pp. 550--553]. Random forest operate by constructing a multitude of decision trees at training time and outputting the value that is mean/average prediction of the individual trees.
+
+
+### Implementation and evaluation
+
+It is clear that various different alternatives and experiments should be created during ML process implementation.
+
+Because of its popularity, efficiency, simplicity and flexibility and because of author's previous experience, R language and environment for statistical computing and graphics [@rfoundations] is used to implement the ML process. A decision tree is a flowchart-like structure in which each internal node represents a "test" on an attribute, each branch represents the outcome of the test, and each leaf node represents a class label (decision taken after computing all attributes). It is clear that  paths from root to leaf represent classification rules.
+
+The following ML predictor models are developed with R functions:
+
+- Function 'knn'[@rfunknn] in library 'class'[@rbibclass] is used for k-nn model realization.
+
+- Function 'NaiveBayes'[@rfunnaivebayes] in library 'klaR'[@rbibklar] is used for nb model realization.
+
+- Function 'ksvm' [@rfunkvsm] in library 'kernlab'[@rbibkernlab] with parameter kernel = vanilladot() that represents linear kernel, is used for svm-l model realization.
+
+- Function 'ksvm'in library 'kernlab' with parameter kernel = "rbfdot" - which represents radial kernel, is used for svm-r model realization.
+
+- Function 'randomForest'[@rfunrandomforest] in library 'randomForest'[@rbibrandomforest] is used for rf model realization.
+
+Last, but not the least, R function 'train' [@rfuntrain] in library 'caret' [@rbibcaret] is used as umbrella that covers all the previously mentioned R functions and libraries for ML. They enables handling of a various learning models and functions in a uniform manner. In this moment, more than 230 classification and regression models are 'out-of-a-box' available for use with 'caret' and all of them are enlisted in [@kuhnam].
+
+Developed models are compared using k-fold validation [@murphy pp. 201--210], with value of parameter k is set to 10. Selected 10-fold validation is realized with caret R functions. In order to achieve exactly the same conditions for comparison among developed ML methods, in all 10-fold validation scenarios, random generator is set on predefined value 155294099.
+
+In order to evaluate quality of the selected ML regression methods, various measures [@murphy pp. 176--194] are used.
+
+The following overall measures are calculated for ML models:
+
+For measuring the performance of algorithms, sensitivity (or recall), specificity and accuracy were used because these three criteria are used more in the medical field.
+
+For calculation of sensitivity, specificity and accuracy confusion matrix is required. In the following table, a confusion matrix is shown:
+
+|                          | Actual class is C1    | Actual class is C2     |
+| :----------------------- | :-------------------: | ---------------------: |
+|  Predicted class is *C1* | True positive ($TP$)  | False positive ($FP$)  |
+|  Predicted class is *C2* | False negative ($TN$) | True negative ($TN$)   |
+
+Cells in confusion matrix have the following meaning [@alizedah2019]:
+ - Actual class is the class which determined by angiography and it is existed in dataset. 
+ - Predicted class is the one which is predicted by algorithms.
+ - $TP$ is number of samples of class C1 which has been correctly classified.
+ - $TN$ is number of samples of class C2 which has been correctly classified.
+ - $FN$ is number of samples of class C1 which has been falsely classified as C2.
+ - $FP$ is number of samples of class C2 which has been falsely classified as C1.
+
+According to confusion matrix, sensitivity, specificity and accuracy are calculated as follows:
+
+
+$$ Specificity = \frac{TN}{TN+FP} $$
+
+$$ Sensitivity = \frac{TP}{TP+FN}  $$
+$$ Accuracy = \frac{TP+TN}{TP+TN+FP+FN}  $$
+
+
+Quality of the classification algorithm is often displayed by ROC (receiver operating characteristic) curve. It is a diagram  showing the performance of a classification model at all classification thresholds. This curve plots two parameters true positive rate ($TPR$) and false positive rate ($FPR$).
+
+True Positive Rate ($TPR$) is a synonym for recall and is defined as follows:
+
+$$ TPR = \frac{TP}{TP+FN}  $$
+
+False Positive Rate ($FPR$) is defined as follows:
+
+$$ FPR = \frac{FP}{TN+FP}  $$
+
+An ROC curve plots $TPR$ vs. $FPR$ at different classification thresholds. Lowering the classification threshold classifies more items as positive, thus increasing both false positives and true positives. 
+
+Area Under the ROC Curve (AUC) measures the entire two-dimensional area underneath the entire ROC curve (think integral calculus) from (0,0) to (1,1).
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# Prepare data set for cross validation and ROC calculation
+heart_dt <-heart_dt[!is.na(heart_dt$target), ]
+heart_dt <-heart_dt[(heart_dt$target==0 || heart_dt$target==1), ]
+heart_dt$Class <- factor( ifelse(heart_dt$target==0, 'normal', 'heart.disease') )
+heart_dt$target <- NULL
+```
+
+```{r echo=FALSE, message=FALSE, include=FALSE}
+
+library(caret)
+
+train_control <- trainControl(
+  method="repeatedcv", 
+  number=10,
+  repeats = 10,
+  classProbs = TRUE,  
+  summaryFunction = twoClassSummary)
+
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the k-nn model:
+
+library(class)
+
+set.seed(155294099)
+model_k_nn <- train(
+  Class~., 
+  data=heart_dt, 
+  trControl=train_control,
+  metric = "ROC",
+  method="knn",
+  na.action = na.omit
+  )
+```
+
+Display info about k-nn model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_k_nn$method
+model_k_nn$finalModel
+model_k_nn$resample$ROC
+confusionMatrix(model_k_nn)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_k_nn)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix k-nn")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the nb model:
+
+library(klaR)
+
+set.seed(155294099)
+model_nb <- train(
+  Class~., 
+  data=heart_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="nb",
+  na.action = na.omit
+  )
+```
+
+Display info about nb model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_nb$method
+model_nb$finalModel
+model_nb$resample$ROC
+confusionMatrix(model_nb)
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_nb)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix nb")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the svm-l model:
+
+library(kernlab)
+
+set.seed(155294099)
+model_svm_l <- train(
+  Class~., 
+  data=heart_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="svmLinear",
+  na.action = na.omit
+  )
+```
+
+Display info about svm-l model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_svm_l$method
+model_svm_l$finalModel
+model_svm_l$resample$ROC
+confusionMatrix(model_svm_l)
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_svm_l)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix svm-l")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the svm-r model:
+
+library(kernlab)
+
+set.seed(155294099)
+model_svm_r <- train(
+  Class~., 
+  data=heart_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="svmRadialCost",
+  na.action = na.omit
+  )
+
+```
+
+Display info about svm-r model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_svm_r$method
+model_svm_r$finalModel
+model_svm_r$resample$ROC
+confusionMatrix(model_svm_r)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_svm_r)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix svm-r")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Train the rf model:
+
+library(randomForest)
+
+set.seed(155294099)
+model_rf <- train(
+  Class~., 
+  data=heart_dt, 
+  trControl=train_control, 
+  metric = "ROC",
+  method="rf",
+  na.action = na.omit
+  )
+
+```
+
+Display info about rf model after 10-fold validation:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+#model_rf$method
+model_rf$finalModel
+model_rf$resample$ROC
+confusionMatrix(model_rf)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+cm <- confusionMatrix(model_rf)
+
+ct <- cm$table 
+ct1 <- round(ct, digits=2)
+fourfoldplot(ct1, color = c("darkblue", "lightblue"), conf.level = 0, margin = 1, main = "Confusion Matrix rf")
+
+TP <- ct[1,1]
+FP <- ct[1,2]
+FN <- ct[2,1]
+TN <- ct[2,2]
+
+Specificity <- TN/(TN+FP)
+
+Sensitivity <- TP/(TP+FN)
+
+Accuracy <- (TP+TN)/(TP+TN+FP+FN)
+
+Specificity
+Sensitivity
+Accuracy
+```
+
+
+
+Let us display ROC curves for the all created ML methods:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+library(pROC)
+
+set.seed(2)
+ind = sample(2, nrow(heart_dt), replace = TRUE, prob=c(0.9,0.1))
+trainset = as.data.frame( heart_dt[ind == 1,] )
+testset = as.data.frame( heart_dt[ind == 2,] )
+
+
+k_nn_prediction = predict(model_k_nn, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+k_nn_ROC = roc(response = head(testset, nrow(k_nn_prediction))[,c("Class")],
+               predictor = k_nn_prediction$heart.disease,
+               levels = levels(testset[ ,"Class"]))
+plot(k_nn_ROC, type="S", col="red")
+
+
+nb_prediction = predict(model_nb, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+nb_ROC = roc(response = head(testset, nrow(nb_prediction))[,c("Class")],
+               predictor = nb_prediction$heart.disease,
+               levels = levels(testset[ ,"Class"]))
+plot(nb_ROC, add=TRUE, col="orange")
+
+
+svm_l_prediction = predict(model_svm_l, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+svm_l_ROC = roc(response = head(testset, nrow(svm_l_prediction))[,c("Class")],
+               predictor = svm_l_prediction$heart.disease,
+               levels = levels(testset[ ,"Class"]))
+plot(svm_l_ROC, add=TRUE, col="blue")
+
+
+svm_r_prediction = predict(model_svm_r, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+svm_r_ROC = roc(response = head(testset, nrow(svm_r_prediction))[,c("Class")],
+               predictor = svm_r_prediction$heart.disease,
+               levels = levels(testset[ ,"Class"]))
+plot(svm_r_ROC, add=TRUE, col="darkblue")
+
+rf_prediction = predict(model_rf, 
+                     testset[,! names(testset) %in% c("Class")], 
+                     type = "prob") 
+rf_ROC = roc(response = head(testset, nrow(rf_prediction))[,c("Class")],
+               predictor = rf_prediction$heart.disease,
+               levels = levels(testset[ ,"Class"]))
+plot(rf_ROC, add=TRUE, col="green")
+title("ROC curves")
+legend("topleft", legend=c("k-nn", "nb", "svm-l", "svm-r", "rf"),
+       col=c("red", "orange", "blue", "darkblue", "green"),  
+       lty=1:5, cex=0.8)
+
+```
+
+
+
+Compare ROC values of all models:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+model_list <- list("k-nn" = model_k_nn, "nb" = model_nb, "svm-l"= model_svm_l, "svm-r"= model_svm_r, "rf"= model_rf)
+res <- resamples( model_list )
+res$values
+summary(res)
+```
+
+Obtained results can be visualized:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+dotplot(res, metric = "ROC")
+
+bwplot(res, layout = c(3, 1))
+```
+
+Moreover, calculated ROC distributions should be visualized:
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+res_df <- as.data.frame(res$values)
+res_df$"k-nn~Sens" <- NULL
+res_df$"k-nn~Spec" <- NULL
+res_df$"nb~Sens" <- NULL
+res_df$"nb~Spec" <- NULL
+res_df$"svm-l~Sens" <- NULL
+res_df$"svm-l~Spec" <- NULL
+res_df$"svm-r~Sens" <- NULL
+res_df$"svm-r~Spec" <- NULL
+res_df$"rf~Sens" <- NULL
+res_df$"rf~Spec" <- NULL
+res_dt <- as.data.table(res_df)
+res_dt <- melt(res_dt, id.vars = c('Resample'), 
+     measure.vars = c('k-nn~ROC', 'nb~ROC', 'svm-l~ROC', 'svm-r~ROC', 'rf~ROC') )
+res_dt[variable == 'k-nn~ROC', variable := 'k-nn']
+res_dt[variable == 'nb~ROC', variable := 'nb']
+res_dt[variable == 'svm-l~ROC', variable := 'svm-l']
+res_dt[variable == 'svm-r~ROC', variable := 'svm-r']
+res_dt[variable == 'rf~ROC', variable := 'rf']
+res_dt%>%setnames("variable", "method")
+ggplot(data=res_dt, aes(x=value, group=method, fill=method)) +
+    geom_density(adjust=1.5, alpha=.4) +
+    xlab("ROC") +
+    ylab("value") + 
+    scale_fill_manual(values=c("red", "orange", "blue", "darkblue", 'green')) +
+    ggtitle("ROC distribution by model") 
+```
+
+
+### Conclusion
+
+The goal of this report is predicting the if individual experience heart disease, starting from his measurable features.
+
+In order to do so, five ML regression models are proposed and its implementations are compared, under the same conditions.
+Models that are implemented based on k-Nearest Neghbours, on Naive Bayes, on Support Vector Machine (with Linear and Radial Kernel) and on Random Forest. In this situation, Random Frest based method was significantly better than its counterparts.
+
+At the end, reader should take care not to jump too early to general conclusions. In other words, as stated in [@murphy pp. 24--25], if obtained results indicate quality of proposed ML model for this specific prediction problem, the same ML model will very likely be inadequate for the other problem. Formal mathematical proof of this statement, widely known as No free lunch theorem for supervised learning, introduced in paper [@walpert1996].
+
+### References
+
+
+
+
