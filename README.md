@@ -1,4 +1,2 @@
-# CardiovascularDiseasePrediction_UsingMLModels
-Cardiovascular Disease Prediction using ML Models
-
-This project was made as final exam project for Data Science Lab, a first year course of the MsC in Data Science at University of Milan Bicocca, supervised by M. Pelagatti. 
+# Cardiovascular Disease Prediction using ML Models
+This project focused on predicting the presence of coronary artery disease (CAD) using machine learning techniques on a comprehensive heart disease dataset compiled from five major sources. The analysis involved exploratory data analysis to understand the correlation between the target variable (presence of heart disease) and 11 clinically relevant features. Five supervised learning models—K-Nearest Neighbors, Naïve Bayes, Support Vector Machines (linear and radial kernels), and Random Forest—were implemented and rigorously evaluated using 10-fold cross-validation. Evaluation metrics included accuracy, sensitivity, specificity, and ROC-AUC scores. A This project exemplifies the application of data science and statistical modeling to support early diagnosis of cardiovascular disease and potentially reduce the need for invasive diagnostic procedures. Here is the [project report](SanjaStanisic_DataScienceLab_FinalProject.pdf). 
